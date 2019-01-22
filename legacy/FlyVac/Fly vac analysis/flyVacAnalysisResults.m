@@ -1,0 +1,1 @@
+[temp.P temp.expStd temp.obStd temp.N temp.chisquaredP temp.muSEM temp.expIQR(1) temp.expIQR(2) temp.obsIQR(1) temp.obsIQR(2) NaN log2((temp.obsIQR(2)-temp.obsIQR(1))/(temp.expIQR(2)-temp.expIQR(1))) log2(temp.obStd/temp.expStd) temp.IPRR];

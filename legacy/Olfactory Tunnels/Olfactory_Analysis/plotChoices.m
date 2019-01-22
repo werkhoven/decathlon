@@ -1,0 +1,2 @@
+function plotChoices(flyTracks,flyIdx)
+
