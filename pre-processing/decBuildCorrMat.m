@@ -1,14 +1,14 @@
 %% Get parent directory of all decathlon files
-
-fDir = autoDir;
+load('D:\Decathlon Raw Data\decathlon 1-2019\meta\culling_ID_permutation.mat');
+fDir = 'D:\Decathlon Raw Data\decathlon 1-2019\data\';
 
 % intialize master struct for data
 dec = repmat(struct('data',[],'fields',[],'name',[],'day',[],'ID',[],'meta',[]),11,1);
-circ = repmat(struct('data',[],'fields',[],'name',[],'day',[],'ID',[],'meta',[]),15,1);
+circ = repmat(struct('data',[],'fields',[],'name',[],'day',[],'ID',[],'meta',[]),11,1);
 
 
-%%
-fPaths = getHiddenMatDir(fDir);
+
+fPaths = recursiveSearch(fDir);
 fDir=cell(size(fPaths));
 for j=1:length(fPaths)
     [tmp_dir,~,~]=fileparts(fPaths{j});
@@ -20,17 +20,17 @@ end
 hwb = waitbar(0,'loading files');
 
 for j = 1:length(fPaths)
-    
+
     hwb = waitbar(j/length(fPaths),hwb,['loading file ' num2str(j) ' of ' num2str(length(fPaths))]);
     load(fPaths{j});                    % read in expmt struct
-    name = expmt.Name;                  % query expmt name
+
+    name = expmt.meta.name;                  % query expmt name
     
     switch name
         case 'Circadian'
             
-            day =  expmt.labels_table.Day(1);   % query testing day
-            circ(day).ID = [circ(day).ID; expmt.labels_table.ID];
-            expmt.nTracks = length(expmt.labels_table.ID);
+            day =  expmt.meta.labels_table.Day(1);   % query testing day
+            circ(day).ID = [circ(day).ID; expmt.meta.labels_table.ID];
             
             % store values in decathlon data struct
             circ(day).name = name;
@@ -64,25 +64,16 @@ for j = 1:length(fPaths)
             
         otherwise
             
-            switch name
-                case 'Olfaction'
-                    day = expmt.Day;
-                    if size(expmt.ID,2) > size(expmt.ID,1)
-                        expmt.ID = expmt.ID';
-                    end
-                    dec(day).ID = [dec(day).ID; expmt.ID];
-                otherwise
-                    day =  expmt.labels_table.Day(1);   % query testing day
-                    dec(day).ID = [dec(day).ID; expmt.labels_table.ID];
-                    expmt.nTracks = length(expmt.labels_table.ID);
-            end
+            % query testing day
+            day =  expmt.meta.labels_table.Day(1);   
 
-            % store values in decathlon data struct
-            dec(day).day = day;
-            
-            if day==1 && strcmp(name,'Y-maze')
+            if day==1 && any(strfind(name,'Y-maze'))
                 name = 'Culling';
             end
+            
+            % store values in decathlon data struct
+            dec(day).ID = [dec(day).ID; expmt.meta.labels_table.ID];
+            dec(day).day = day;
             dec(day).name = name;
             
 
@@ -118,9 +109,22 @@ for j = 1:length(fPaths)
     
     
 end
-    
+
 delete(hwb);
     
+%%
+
+f = fieldnames(dec(1).data);
+for i=1:numel(f)
+    dec(1).data.(f{i}) = dec(1).data.(f{i})(ID.culling);
+    dec(1).ID = ID.decathlon;
+end
+
+f = fieldnames(dec(1).meta);
+for i=1:numel(f)
+    dec(1).meta.(f{i}) = dec(1).meta.(f{i})(ID.culling);
+end
+
 %% create data matrix and create labels array
 
 % query max number of data points
@@ -136,15 +140,13 @@ for i = 1:length(circ)
     cnFields = cnFields + length(circ(i).fields);
 end
 
-
-
 % model nuisance variable effects and replaced with residuals if necessary
 [dec,declm] = modelEffects(dec,nFields,'TimeofDay',false);
 [circ,circlm] = modelEffects(circ,cnFields,'TimeofDay',false);
 
 % initialize data mat (observations x variables)
 nFields = nFields + cnFields;
-n={circ(:).ID};
+n={dec(:).ID};
 n=cat(1,n{:});
 dMat = NaN(max(n),nFields);
 dFields = cell(nFields,1);
@@ -202,14 +204,22 @@ circ(arrayfun(@(x) isempty(circ(x).data),1:length(circ)))=[];
 
 
 dMat(~any(~isnan(dMat')),:)=[];
-clearvars -except dec circ dMat dFields nFields declm circlm
+clearvars -except n dec circ dMat dFields nFields declm circlm
 %% unfiltered raw data
 
+% plot num active
+num_active = arrayfun(@(i) sum(i.data.filter), circ);
+plot(num_active,'LineWidth',2);
+set(gca,'YLim',[0 size(dMat,1)]);
+xlabel('Day');
+ylabel('Number Active');
+title('Decathlon 3 - Flies Active');
+
 nMat = nanzscore(dMat);
-[fh,r,p]=plotCorr(dMat,'Labels',dFields,'Cluster',true);
-
-%% filter and match fields between D1 and D2
-
+[fh,r,p]=plotCorr(nMat,'Labels',dFields,'Cluster',true);
+title('Decathlon 3 - Raw Correlation P-Values');
+figure(fh);
+title('Decathlon 3 - Raw Correlation Matrix');
 
 
 %% create plot for number of samples
@@ -222,21 +232,30 @@ colormap('cool');
 colorbar
 %caxis([-1,1]);
 
+% format field labels for display
+fLabels = dFields;
+for i = 1:length(fLabels)
+    tmp = fLabels{i};
+    tmp(tmp=='_')=' ';
+    fLabels(i)={tmp};
+end
+
 fsz = 10;
 hold on
-set(gca,'Xtick',1:size(data,1),'Ytick',1:size(data,1),'FontSize',fsz);
+set(gca,'Xtick',1:size(dFields,1),'Ytick',1:size(dFields,1),'FontSize',fsz);
 for i=1:size(n,1)
     for j=1:size(n,2)
         if i~=j
             text(i,j-0.2,num2str(n(i,j)),...
-                'HorizontalAlignment','center','FontSize',5,'FontUnits','normalized');
+                'HorizontalAlignment','center','FontSize',7);
         end
     end
 end
 hold off
 set(gca,'fontsize', fsz);
-set(gca,'Ytick',[1:nFields],'YtickLabel', clusteredLabels,'fontsize',10);
-set(gca,'XTick',1:length(dFields),'XTickLabel',clusteredLabels,'fontsize',10,'XTickLabelRotation',45);
+set(gca,'Ytick',[1:nFields],'YtickLabel', fLabels,'fontsize',8);
+set(gca,'XTick',1:length(dFields),'XTickLabel', fLabels,'fontsize',8,'XTickLabelRotation',45);
+title('Sample Size');
 
 
 %% separate measures into distinct clusters with no apriori hypothesis of correlation
@@ -245,16 +264,18 @@ distinctClusters = [{'activity'};{'handedness'};...
     {'phototaxis'};{'olfaction'};{'optomotor'};...
     {'clumpiness'};{'switchiness'}];
 
-clusterIdx = [{[2,4,6,9,11,13,15,17,20,24,26,31,33,35,41,43]};...
-    {[5,10,21,28,36]};{[7,37]};{27};{18};{[22,30,38]};{[23,39,40]}];
-
-independentMat = NaN(size(dMat,1),length(clusterIdx));
-varCaptured = NaN(length(clusterIdx),1);
+clusterIdx = [{[2,7,9,12,14,17,20,23,26,32,34,39,41,44,48,54,56,59]};...
+    {[1,4,8,11,13,16,19,22,25,28,33,36,40,43,47,51,55,58]};...
+    {[18,29,45]};{50};{24};{[5,30,37,52]};{[6,31,38,53]}];
 
 % z-score the data and replace missing values by linear regression
-tmpMat = dMat;
+tmpMat = dMat(1:192,:);
 tmpMat = nanzscore(tmpMat);
 tmpMat = fillWithRegressedValues(tmpMat);
+
+% initialize placeholders
+independentMat = NaN(size(tmpMat,1),length(clusterIdx));
+varCaptured = NaN(length(clusterIdx),1);
 
 
 for i = 1:length(clusterIdx)
@@ -265,29 +286,22 @@ for i = 1:length(clusterIdx)
     
 end
 
-plotCorr(independentMat,distinctClusters);
+plotCorr(independentMat, 'Labels', distinctClusters, 'Cluster', false);
+title('Decathlon - PC1 apriori groups');
 
 figure;
-bh=bar(varCaptured(Zoutperm));
-set(gca,'XTick',1:length(varCaptured),'XTickLabel',clusteredLabels,'XTickLabelRotation',45);
+bh=bar(varCaptured);
+set(gca,'XTick',1:length(varCaptured),'XTickLabel',distinctClusters,'XTickLabelRotation',45);
 ylabel('variance captured for each grouping');
 
-%% look within each category of metric
 
-handMat = dMat(:,clusterIdx{2});
-handFields = dFields(clusterIdx{2});
+%% plot correlations sorted by date
 
-plotCorr(handMat,handFields);
+D3.data = dMat;
+D3.fields = dFields;
 
-%%
-actMat = dMat(:,clusterIdx{1});
-actFields = dFields(clusterIdx{1});
+% collapse circadian metrics
+D3col = collapseMetrics(D3);
+plotCorr_byDate(D3col.data,D3col.fields);
 
-plotCorr(actMat,actFields);
 
-%%
-
-clumpMat = dMat(:,clusterIdx{6});
-clumpFields = dFields(clusterIdx{6});
-
-plotCorr(clumpMat,clumpFields);

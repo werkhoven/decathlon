@@ -59,7 +59,7 @@ switch fields
         grps = cat(1,apriori_groups{:,2});
         for i=1:length(unique(grps))
             uf = apriori_groups(grps==i,1);
-            idx = cellfun(@(x) any(strcmp(uf,x)),f);
+            idx = cellfun(@(x) any(strcmpi(uf,x)),f);
             data=D.data(:,idx);
             if ~isempty(data)
             switch mode

@@ -36,7 +36,7 @@ if trim
 end
 
 % get mapping between datasets A and B
-permutation = cellfun(@(x) find(strcmp(x,f2(:))),f1,'UniformOutput',false);
+permutation = cellfun(@(x) find(strcmpi(x,f2(:)),1,'Last'),f1,'UniformOutput',false);
 idxA = 1:length(f1);
 idxA(cellfun(@isempty,permutation))=[];
 permutation(cellfun(@isempty,permutation))=[];
@@ -61,8 +61,10 @@ subset = sub2ind(size(A.r),subset(:,1),subset(:,2));
 
 if doplot
     ah=gca;
-    scatter(ah,A.r(subset),B.r(subset),'o','MarkerEdgeColor',[0 0 0],...
-        'MarkerFaceColor',[.6 .6 .6],'LineWidth',1.5);
+    opts = {'Marker'; 'o'; 'LineStyle'; 'none';...
+        'MarkerFaceColor'; 'k'; 'MarkerEdgeColor'; 'none';...
+        'MarkerSize'; 2; 'LineWidth'; 2};
+    plot(ah,A.r(subset),B.r(subset),'o',opts{:});
     disp(['r=' num2str(r(1,2)) ' (p=' num2str(p(1,2)) ')']);
     xlabel('r-value (dataset 1)');
     ylabel('r-value (dataset 2)');

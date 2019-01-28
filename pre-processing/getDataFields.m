@@ -1,122 +1,94 @@
 function [data,f] = getDataFields(expmt)
 
-    switch expmt.Name
+    reset(expmt);
+    switch expmt.meta.name
         
-        case 'Arena Circling'
+        case 'Basic Tracking'
             
             f = {'circling';'speed'}; 
-            data.circling = expmt.handedness.mu;
-            data.speed = expmt.Speed.avg;
-            
-            if ~isfield(expmt.Speed,'active')
-                expmt.Speed.active = expmt.Speed.avg > 0.1;
-            end
-            
-            data.filter = expmt.Speed.active;
-            
-            if isfield(expmt,'Gravitaxis');
-                f = [f;{'yBias';'xBias';'index';'prob'}];
-                data.yBias = expmt.Gravitaxis.yBias;
-                data.xBias = expmt.Gravitaxis.xBias;
-                data.index = expmt.Gravitaxis.index;
-                data.prob = expmt.Gravitaxis.prob;
-            end
+            data.circling = expmt.meta.handedness.mu;
+            data.speed = nanmean(expmt.data.speed.raw());
+            data.filter = nanmean(expmt.data.speed.raw()) > 0.1;
 
-        case 'Y-maze'     
+        case 'Y-Maze'     
             
-            idx = 1:expmt.nTracks;
+            idx = 1:numel(expmt.meta.labels_table.ID);
+            expmt.meta.num_traces = numel(expmt.meta.labels_table.ID);
             
-            f = {'right_bias';'hand_clumpiness';'hand_switchiness';'speed'}; 
-            data.circling_mu = expmt.handedness.mu(idx);
-            data.right_bias = expmt.Turns.rBias(idx);
-            data.hand_clumpiness = expmt.Turns.clumpiness(idx);
-            data.hand_switchiness = expmt.Turns.switchiness(idx);
-            data.speed = expmt.Speed.avg(idx);
-            data.filter = expmt.Turns.n(idx) > 25;
+            f = {'circling_mu';'right_bias';'hand_clumpiness';...
+                'hand_switchiness';'speed';'nTrials'};
+            data.circling_mu = expmt.meta.handedness.mu(idx);
+            data.right_bias = expmt.data.Turns.rBias(idx);
+            data.hand_clumpiness = expmt.data.Turns.clumpiness(idx);
+            data.hand_switchiness = expmt.data.Turns.switchiness(idx);
+            data.speed = nanmean(expmt.data.speed.raw(:,idx));
+            data.nTrials = expmt.data.Turns.n(idx);
+            data.filter = expmt.data.Turns.n(idx) > 25;
 
         case 'LED Y-maze'
 
-            idx = expmt.labels{1,4}:expmt.labels{1,5};
+            idx = 1:numel(expmt.meta.labels_table.ID);
+            expmt.meta.num_traces = numel(expmt.meta.labels_table.ID);
             
-            f = {'right_bias';'light_bias';'hand_clumpiness';'hand_switchiness';'light_switchiness';'speed'}; 
-            data.right_bias = expmt.Turns.rBias(idx);
-            data.light_bias = expmt.LightChoice.pBias(idx);
-            data.hand_clumpiness = expmt.Turns.clumpiness(idx);
-            data.hand_switchiness = expmt.Turns.switchiness(idx);
-            data.light_switchiness = expmt.LightChoice.switchiness(idx);
-            data.speed = expmt.Speed.avg(idx);
-            data.filter = expmt.Turns.n(idx) > 25;
+            f = {'circling_mu';'right_bias';'light_bias';...
+                'hand_clumpiness';'hand_switchiness';'speed';'nTrials'}; 
+            data.circling_mu = expmt.meta.handedness.mu(idx);
+            data.right_bias = expmt.data.Turns.rBias(idx);
+            data.light_bias = expmt.data.LightChoice.pBias(idx);
+            data.hand_clumpiness = expmt.data.Turns.clumpiness(idx);
+            data.hand_switchiness = expmt.data.Turns.switchiness(idx);
+            data.light_switchiness = expmt.data.LightChoice.switchiness(idx);
+            data.speed = nanmean(expmt.data.speed.raw(:,idx));
+            data.nTrials = expmt.data.Turns.n(idx);
+            data.filter = expmt.data.Turns.n(idx) > 25;
 
         case 'Slow Phototaxis'
 
-            f = {'circling';'speed';'occupancy'}; 
-            data.circling = expmt.handedness.mu;
-            data.occupancy = expmt.Light.avg_occ;
-            data.speed = expmt.Speed.avg;
-            data.filter = expmt.Speed.active;
+            f = {'circling';'speed';'occupancy';'nTrials'}; 
+            data.circling = expmt.meta.handedness.mu;
+            data.occupancy = expmt.meta.Light.avg_occ;
+            data.speed = nanmean(expmt.data.speed.raw());
+            data.nTrials = cellfun(@(t) sum(t>0), expmt.meta.Light.tInc);
+            data.filter = nanmean(expmt.data.speed.raw()) > 0.1;
 
         case 'Optomotor'
 
-            f = {'circling';'speed';'optomotor_index'}; 
-            data.circling = expmt.handedness.mu;
-            data.optomotor_index = -expmt.Optomotor.index;
-            if isfield(expmt.Speed,'avg')
-                data.speed = expmt.Speed.avg;
-                data.filter = expmt.Speed.active;
-            else
-                data.speed = nanmean(expmt.Speed.data);
-                data.filter = data.speed > 0.01;
-            end
+            f = {'circling';'speed';'optomotor_index';'nTrials'}; 
+            data.circling = expmt.meta.handedness.mu;
+            data.optomotor_index = -expmt.meta.Optomotor.index;
+            data.speed = nanmean(expmt.data.speed.raw());
+            data.nTrials = sum(diff(expmt.data.StimStatus.raw())==1);
+            data.filter = nanmean(expmt.data.speed.raw()) > 0.1;
             
-
         case 'Circadian'
-
             
-            f = {'circling';'speed'}; 
-            data.circling = expmt.handedness.mu;
-            data.speed = nanmean(expmt.Speed.data);
-            data.filter = data.speed > 0.1;
-
-            if isfield(expmt,'Gravity');
-                %{
-                f = [f;{'index';'circling_corrected';'circling_floor';'circling_ceiling'}];
-
-                data.index = expmt.Gravity.index;
-                data.circling_corrected = expmt.Gravity.mu;
-                data.circling_ceiling = expmt.handedness_ceiling.mu;
-                data.circling_floor = expmt.handedness_floor.mu;
-                %}
-                
-                f = [f;{'gravitactic_index'}];
-
-                data.gravitactic_index = expmt.Gravity.index;
-                data.circling = expmt.Gravity.mu;
-
-            end
+            f = {'circling';'speed';'gravitactic_index'}; 
+            data.circling = expmt.meta.handedness.mu;
+            data.gravitactic_index = expmt.data.area.gravity_index;
+            data.speed = nanmean(expmt.data.speed.raw());
+            data.filter = nanmean(expmt.data.speed.raw()) > 0.1;
 
         case 'Olfaction'
             
-            f = {'occupancy';'right_bias';'hand_clumpiness';'hand_switchiness';'speed'};
-            data.occupancy = expmt.occupancy;
-            data.right_bias = expmt.Turns.rBias;
-            data.hand_clumpiness = expmt.Turns.clumpiness;
-            data.hand_switchiness = expmt.Turns.switchiness;
-            data.speed = nanmean(expmt.velocity);
+            f = {'occupancy';'right_bias';'hand_clumpiness';...
+                'hand_switchiness';'speed';'nTrials'};
+            data.occupancy = expmt.meta.occupancy;
+            data.right_bias = expmt.data.Turns.rBias;
+            data.hand_clumpiness = expmt.data.Turns.clumpiness;
+            data.hand_switchiness = expmt.data.Turns.switchiness;
+            data.speed = nanmean(expmt.meta.velocity);
+            data.nTrials = expmt.data.Turns.n;
             data.filter = data.speed > 1;
             
         case 'Temporal Phototaxis'
             
-            f = {'circling';'speed';'occupancy';'iti'}; 
-            data.circling = expmt.handedness.mu;
-            data.speed = expmt.Speed.avg;
-            data.occupancy = expmt.LightStatus.occ;
-            data.iti = expmt.LightStatus.iti;
-            
-            if ~isfield(expmt.Speed,'active')
-                expmt.Speed.active = expmt.Speed.avg > 0.01;
-            end
-            
-            data.filter = expmt.Speed.active;
+            f = {'circling';'speed';'occupancy';'iti';'nTrials'}; 
+            data.circling = expmt.meta.handedness.mu;
+            data.speed = nanmean(expmt.data.speed.raw());
+            data.occupancy = expmt.data.LightStatus.occ;
+            data.iti = expmt.data.LightStatus.iti;       
+            data.nTrials = expmt.data.LightStatus.n;
+            data.filter = nanmean(expmt.data.speed.raw()) > 0.1;
 
         otherwise
             errordlg('Experiment name not recognized, no analysis performed');
@@ -133,7 +105,7 @@ function [data,f] = getDataFields(expmt)
     fn = fieldnames(data);
     for i = 1:length(fn)
         tmp = data.(fn{i});
-        if find(size(tmp)==expmt.nTracks,1)==2
+        if find(size(tmp)==expmt.meta.num_traces,1)==2
             data.(fn{i}) = data.(fn{i})';
         end
     end      
